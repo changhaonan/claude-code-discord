@@ -315,6 +315,10 @@ export async function sendToClaudeCode(
         console.log(`Session resuming with ID: ${cleanedSessionId}`);
       }
       
+      // Workaround for SDK race condition: delay before starting query
+      // https://github.com/anthropics/claude-agent-sdk-python/issues/266
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const iterator = claudeQuery(queryOptions);
       // Store query reference for mid-session controls (interrupt, rewind, info)
       setActiveQuery(iterator);
