@@ -190,7 +190,7 @@ export async function sendToClaudeCode(
     : [];
 
   // Wrap with comprehensive error handling
-  const executeWithErrorHandling = async (overrideModel?: string) => {
+  const executeWithErrorHandling = async (overrideModel?: string, retryCount = 0) => {
     try {
       // Determine which model to use
       const modelToUse = overrideModel || modelOptions?.model;
@@ -385,6 +385,19 @@ export async function sendToClaudeCode(
     } catch (error: any) {
       // Clear active query on error
       setActiveQuery(null);
+      
+      // Handle ProcessTransport not ready - retry with exponential backoff
+      if (error.message && error.message.includes('ProcessTransport is not ready for writing')) {
+        const maxRetries = 3;
+        if (retryCount < maxRetries) {
+          const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+          console.log(`Claude Code: Transport not ready, retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return executeWithErrorHandling(overrideModel, retryCount + 1);
+        }
+        console.error(`Claude Code: Max retries exceeded for transport error`);
+      }
+      
       // Properly handle process exit code 143 (SIGTERM) and AbortError
       if (error.name === 'AbortError' || 
           controller.signal.aborted || 
